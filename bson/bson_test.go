@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"net/url"
 	"reflect"
 	"testing"
@@ -1341,14 +1340,12 @@ func testCrossPair(c *C, dump interface{}, load interface{}) {
 	c.Assert(zero, DeepEquals, load)
 }
 
-/*
 func (s *S) TestTwoWayCrossPairs(c *C) {
 	for _, item := range twoWayCrossItems {
 		testCrossPair(c, item.obj1, item.obj2)
 		testCrossPair(c, item.obj2, item.obj1)
 	}
 }
-*/
 
 func (s *S) TestOneWayCrossPairs(c *C) {
 	for _, item := range oneWayCrossItems {
@@ -1561,26 +1558,22 @@ var textIdTests = []struct {
 	text:      "",
 	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
+	error:     "",
 }, {
 	text:      "4d88e15b60f486e428412dc9A",
 	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dc9A`,
 }, {
 	text:      "4d88e15b60f486e428412dcZ",
 	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dcZ .*`,
 }}
 
 func (s *S) TestObjectIdTextMarshaling(c *C) {
 	for _, test := range textIdTests {
-
-		fmt.Println(test.text)
-
 		if test.marshal {
-			fmt.Println("Marshal: " + test.text)
 			data, err := test.value.MarshalText()
 			if test.error == "" {
 				c.Assert(err, IsNil)
@@ -1591,11 +1584,8 @@ func (s *S) TestObjectIdTextMarshaling(c *C) {
 		}
 
 		if test.unmarshal {
-			fmt.Println("Unmarshal: " + test.text)
 			err := test.value.UnmarshalText([]byte(test.text))
 			if test.error == "" {
-				fmt.Println(test.value)
-				fmt.Println(err)
 				c.Assert(err, IsNil)
 				if test.value != "" {
 					value := bson.ObjectIdHex(test.text)
@@ -1630,13 +1620,7 @@ var xmlIdTests = []struct {
 	value:     xmlType{},
 	xml:       "<xmlType><Id></Id></xmlType>",
 	marshal:   true,
-	unmarshal: false,
-}, {
-	value:     xmlType{},
-	xml:       "<xmlType><Id></Id></xmlType>",
-	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
 }, {
 	xml:       "<xmlType><Id></Id></xmlType>",
 	marshal:   true,
@@ -1645,12 +1629,12 @@ var xmlIdTests = []struct {
 	xml:       "<xmlType><Id>4d88e15b60f486e428412dc9A</Id></xmlType>",
 	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dc9A`,
 }, {
 	xml:       "<xmlType><Id>4d88e15b60f486e428412dcZ</Id></xmlType>",
 	marshal:   false,
 	unmarshal: true,
-	error:     "invalid bson.ObjectId value",
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dcZ .*`,
 }}
 
 func (s *S) TestObjectIdXMLMarshaling(c *C) {
