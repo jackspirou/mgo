@@ -1553,12 +1553,7 @@ var textIdTests = []struct {
 }, {
 	text:      "",
 	marshal:   true,
-	unmarshal: false,
-}, {
-	text:      "",
-	marshal:   false,
 	unmarshal: true,
-	error:     "",
 }, {
 	text:      "4d88e15b60f486e428412dc9A",
 	marshal:   false,
@@ -1621,10 +1616,6 @@ var xmlIdTests = []struct {
 	xml:       "<xmlType><Id></Id></xmlType>",
 	marshal:   true,
 	unmarshal: true,
-}, {
-	xml:       "<xmlType><Id></Id></xmlType>",
-	marshal:   true,
-	unmarshal: false,
 }, {
 	xml:       "<xmlType><Id>4d88e15b60f486e428412dc9A</Id></xmlType>",
 	marshal:   false,
