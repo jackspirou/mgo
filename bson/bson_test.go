@@ -30,6 +30,7 @@ package bson_test
 import (
 	"encoding/binary"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"net/url"
 	"reflect"
@@ -1056,6 +1057,25 @@ func (i *getterSetterInt) SetBSON(raw bson.Raw) error {
 	return err
 }
 
+type ifaceType interface {
+	Hello()
+}
+
+type ifaceSlice []ifaceType
+
+func (s *ifaceSlice) SetBSON(raw bson.Raw) error {
+	var ns []int
+	if err := raw.Unmarshal(&ns); err != nil {
+		return err
+	}
+	*s = make(ifaceSlice, ns[0])
+	return nil
+}
+
+func (s ifaceSlice) GetBSON() (interface{}, error) {
+	return []int{len(s)}, nil
+}
+
 type (
 	MyString string
 	MyBytes  []byte
@@ -1249,6 +1269,7 @@ var twoWayCrossItems = []crossTypeItem{
 
 	// arrays
 	{&struct{ V [2]int }{[...]int{1, 2}}, map[string][2]int{"v": [2]int{1, 2}}},
+	{&struct{ V [2]byte }{[...]byte{1, 2}}, map[string][2]byte{"v": [2]byte{1, 2}}},
 
 	// zero time
 	{&struct{ V time.Time }{}, map[string]interface{}{"v": time.Time{}}},
@@ -1281,6 +1302,9 @@ var twoWayCrossItems = []crossTypeItem{
 	// bson.D <=> non-struct getter/setter
 	{&bson.D{{"a", 1}}, &getterSetterD{{"a", 1}, {"suffix", true}}},
 	{&bson.D{{"a", 42}}, &gsintvar},
+
+	// Interface slice setter.
+	{&struct{ V ifaceSlice }{ifaceSlice{nil, nil, nil}}, bson.M{"v": []interface{}{3}}},
 }
 
 // Same thing, but only one way (obj1 => obj2).
@@ -1502,6 +1526,123 @@ func (s *S) TestObjectIdJSONMarshaling(c *C) {
 		if test.unmarshal {
 			var value jsonType
 			err := json.Unmarshal([]byte(test.json), &value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(value, DeepEquals, test.value)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+	}
+}
+
+// --------------------------------------------------------------------------
+// ObjectId Text encoding.TextUnmarshaler.
+
+var textIdTests = []struct {
+	value     bson.ObjectId
+	text      string
+	marshal   bool
+	unmarshal bool
+	error     string
+}{{
+	value:     bson.ObjectIdHex("4d88e15b60f486e428412dc9"),
+	text:      "4d88e15b60f486e428412dc9",
+	marshal:   true,
+	unmarshal: true,
+}, {
+	text:      "",
+	marshal:   true,
+	unmarshal: true,
+}, {
+	text:      "4d88e15b60f486e428412dc9A",
+	marshal:   false,
+	unmarshal: true,
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dc9A`,
+}, {
+	text:      "4d88e15b60f486e428412dcZ",
+	marshal:   false,
+	unmarshal: true,
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dcZ .*`,
+}}
+
+func (s *S) TestObjectIdTextMarshaling(c *C) {
+	for _, test := range textIdTests {
+		if test.marshal {
+			data, err := test.value.MarshalText()
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(string(data), Equals, test.text)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+
+		if test.unmarshal {
+			err := test.value.UnmarshalText([]byte(test.text))
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				if test.value != "" {
+					value := bson.ObjectIdHex(test.text)
+					c.Assert(value, DeepEquals, test.value)
+				}
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+	}
+}
+
+// --------------------------------------------------------------------------
+// ObjectId XML marshalling.
+
+type xmlType struct {
+	Id bson.ObjectId
+}
+
+var xmlIdTests = []struct {
+	value     xmlType
+	xml       string
+	marshal   bool
+	unmarshal bool
+	error     string
+}{{
+	value:     xmlType{Id: bson.ObjectIdHex("4d88e15b60f486e428412dc9")},
+	xml:       "<xmlType><Id>4d88e15b60f486e428412dc9</Id></xmlType>",
+	marshal:   true,
+	unmarshal: true,
+}, {
+	value:     xmlType{},
+	xml:       "<xmlType><Id></Id></xmlType>",
+	marshal:   true,
+	unmarshal: true,
+}, {
+	xml:       "<xmlType><Id>4d88e15b60f486e428412dc9A</Id></xmlType>",
+	marshal:   false,
+	unmarshal: true,
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dc9A`,
+}, {
+	xml:       "<xmlType><Id>4d88e15b60f486e428412dcZ</Id></xmlType>",
+	marshal:   false,
+	unmarshal: true,
+	error:     `Invalid ObjectId in Text: 4d88e15b60f486e428412dcZ .*`,
+}}
+
+func (s *S) TestObjectIdXMLMarshaling(c *C) {
+	for _, test := range xmlIdTests {
+		if test.marshal {
+			data, err := xml.Marshal(&test.value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(string(data), Equals, test.xml)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+
+		if test.unmarshal {
+			var value xmlType
+			err := xml.Unmarshal([]byte(test.xml), &value)
 			if test.error == "" {
 				c.Assert(err, IsNil)
 				c.Assert(value, DeepEquals, test.value)
